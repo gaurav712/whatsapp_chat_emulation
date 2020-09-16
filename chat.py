@@ -1,4 +1,5 @@
 import sys
+import curses
 
 # FUNCTIONS
 
@@ -48,13 +49,54 @@ def list_to_string(my_list):
         my_str += elems
     return my_str
 
+# Fetches the speaker for the dialogue
+def split_speaker_and_dialogue(line):
+
+    speaker = ((line.split(':'))[0]).strip()
+    dialogue = list_to_string((line.split(':'))[1:])
+
+    return speaker, dialogue
+
+def represent_dialogues(scr, dialogues):
+    
+    scr.scrollok(1)
+
+    # Print dialogues
+    for dialogue in dialogues:
+
+        if dialogue[0].find(':') == -1:
+            continue
+
+        speaker, dialogue[0] = split_speaker_and_dialogue(dialogue[0])
+        lines = list_to_string(dialogue)
+
+        scr.addstr(speaker + ':\n')
+        scr.addstr(lines + '\n')
+
+    scr.refresh()
+
+    while True:
+        key = scr.getch()
+
+        if key == 81:
+            break
+        elif key == curses.KEY_UP:
+            scr.scroll(-1)
+        elif key == curses.KEY_DOWN:
+            scr.scroll(1)
+
+
 dialogues = [[]]
 
 # Check arguments
 arguments = sys.argv
 if len(arguments) != 2:
+    # perror("USAGE:\n\t" + arguments[0] + "-f path_to_file -p perspective\n")
     perror("USAGE:\n\t" + arguments[0] + " path_to_file\n")
     exit(1)
+
+# Set Perspective according to -p flag
+# perspective = ""
 
 # Open the file
 chat_file = open(arguments[1], "rt")
@@ -95,3 +137,5 @@ dialogues = dialogues[1:-1]
 # It's representation time!
 print(dialogues)
 
+# Calling in a wrapper to avoid exceptions
+curses.wrapper(represent_dialogues, dialogues)
