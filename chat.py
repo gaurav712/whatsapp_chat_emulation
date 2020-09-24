@@ -1,7 +1,19 @@
 import sys
+import math
 import curses
+import textwrap
 
-# FUNCTIONS
+## GLOBALS
+
+perspective = ""
+
+CURRENT_ROW = 0
+MAX_ROWS = 0
+MAX_COLUMNS = 0
+DIALOGUE_PADDING = "                              "
+WRAP_AT = 40
+
+## FUNCTIONS
 
 # To print to stderr
 def perror(msg):
@@ -57,21 +69,79 @@ def split_speaker_and_dialogue(line):
 
     return speaker, dialogue
 
+# Calculates the number of lines a string needs to fit in
+def get_num_of_lines(dialogue):
+
+    count = 0
+
+    # return math.ceil((len(text) % maxcol))
+
+    for text in dialogue:
+        if len(text) > MAX_COLUMNS:
+            count += math.ceil((len(text) % MAX_COLUMNS))
+        else:
+            count += 1
+    
+    return count
+
+# Makes a list of all the dialogues, padded, and ready to print
+def make_list(dialogues):
+
+    final_list = []
+
+    # Get the perspective if not provided by default
+    # Check contidion TBD
+    # perspective, dialogues[0][0] = split_speaker_and_dialogue(dialogues[0][0])
+    perspective = 'Anjali'
+    
+    for dialogue in dialogues:
+
+        # Check perspective
+        if ((dialogue[0]).split(':'))[0].strip() == perspective:
+            padding = DIALOGUE_PADDING
+        else:
+            padding = ""
+        
+        for line in dialogue:
+            # current_line = padding + line
+
+            line = textwrap.wrap(line, WRAP_AT)
+
+            for index in range(len(line)):
+                line[index] = padding + line[index]
+
+            final_list += line
+
+    return final_list
+
 def represent_dialogues(scr, dialogues):
     
     scr.scrollok(1)
 
-    # Print dialogues
-    for dialogue in dialogues:
+    MAX_ROWS = (scr.getmaxyx())[0]
+    MAX_COLUMNS = (scr.getmaxyx())[1]
 
-        if dialogue[0].find(':') == -1:
-            continue
+    list_to_print = make_list(dialogues)
 
-        speaker, dialogue[0] = split_speaker_and_dialogue(dialogue[0])
-        lines = list_to_string(dialogue)
+    del dialogues
 
-        scr.addstr(speaker + ':\n')
+    for lines in list_to_print:
         scr.addstr(lines + '\n')
+    
+    # scr.addstr('\n\n')
+
+    # Print dialogues
+    # for dialogue in dialogues:
+
+    #     if dialogue[0].find(':') == -1:
+    #         continue
+
+    #     speaker, dialogue[0] = split_speaker_and_dialogue(dialogue[0])
+    #     lines = list_to_string(dialogue)
+
+    #     scr.addstr(speaker + ':\n')
+    #     scr.addstr(lines + '\n')
+
 
     scr.refresh()
 
@@ -135,7 +205,7 @@ for line in chat:
 dialogues = dialogues[1:-1]
 
 # It's representation time!
-print(dialogues)
+# print(dialogues)
 
 # Calling in a wrapper to avoid exceptions
 curses.wrapper(represent_dialogues, dialogues)
