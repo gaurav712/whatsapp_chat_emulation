@@ -2,16 +2,103 @@ import sys
 import math
 import curses
 import textwrap
+import gi
+from optparse import OptionParser
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk, Gdk
 
 ## GLOBALS
-
 perspective = ""
 
-CURRENT_ROW = 0
-MAX_ROWS = 0
-MAX_COLUMNS = 0
-DIALOGUE_PADDING = "                              "
-WRAP_AT = 40
+# Classes
+
+class ChatBubble(Gtk.Label):
+
+    def __init__(self, left, dialogue, list_box):
+
+        # Make a box container for the label
+        self.box = Gtk.Box()
+
+        # Making the label itself
+        # self.label = Gtk.Label(label = dialogue)
+        self.label = Gtk.Label()
+        self.label.set_markup(dialogue)
+        self.label.set_selectable(Gtk.SelectionMode.NONE)
+        self.label.set_line_wrap(True)
+
+        # Set perspective for proper look and alignment
+        if left:
+            self.label.set_name("non_persp_dialogue")
+            self.label.set_xalign(0)
+            self.label.set_margin_end(100)
+            # Add label to the box
+            self.box.pack_start(self.label, False, False, 5)
+        else:
+            self.label.set_name("persp_dialogue")
+            self.label.set_xalign(1)
+            self.label.set_margin_start(100)
+            # Add label to the box
+            self.box.pack_end(self.label, False, False, 5)
+        
+        # Make a ListBox row and add the box
+        self.list_box_row = Gtk.ListBoxRow()
+        self.list_box_row.add(self.box)
+
+        # Add the row to the list
+        list_box.add(self.list_box_row)
+
+
+class MainWindow(Gtk.Window):
+
+    def __init__(self, dialogues):
+
+        Gtk.Window.__init__(self, title="WhatsApp Chat Emulation")
+
+        # Set window default size
+        self.set_size_request(560,640)
+
+        # To make the content scrollable
+        self.scrolled_window = Gtk.ScrolledWindow()
+
+        # Load CSS
+        self.css = b"""
+                #non_persp_dialogue {   background-color: #303030; color: #ffffff; border-radius: 5px; padding: 5px }
+                #persp_dialogue {  background-color: #075e54; color: #ffffff; border-radius: 5px; padding: 5px }
+                """
+        self.css_provider = Gtk.CssProvider()
+        self.css_provider.load_from_data(self.css)
+        self.context = Gtk.StyleContext()
+        self.screen = Gdk.Screen.get_default()
+        self.context.add_provider_for_screen(self.screen, self.css_provider,
+                                            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
+        # ListBox for storing all the labels
+        self.list_box = Gtk.ListBox()
+        self.list_box.set_selection_mode(Gtk.SelectionMode.NONE)
+
+        for elem in dialogues:
+
+            # Ignore if it's not a dialogue
+            if elem[0].find(':') == -1:
+                continue
+            
+            self.speaker, self.dialogue = split_speaker_and_dialogue(elem)
+
+            # Just skip those <Media omitted> texts
+            if self.dialogue.find('<Media omitted>') != -1:
+                continue
+
+            # Now create those chat bubbles
+            if self.speaker == perspective:
+                self.left = False
+            else:
+                self.left = True
+            ChatBubble(self.left,  ('<b>' + self.speaker + '</b>\n' + self.dialogue), self.list_box)
+        
+        # Add the list_box to scrollable window and the later to the main window
+        self.scrolled_window.add(self.list_box)
+        self.add(self.scrolled_window)
+
 
 ## FUNCTIONS
 
@@ -57,119 +144,48 @@ def is_a_marker(text):
 # Merges a list of strings to make it a single string
 def list_to_string(my_list):
     my_str = ""
-    for elems in my_list:
-        my_str += elems
-    return my_str
+
+    for elem in my_list:
+        my_str += elem + '\n'
+
+    return my_str.strip()
 
 # Fetches the speaker for the dialogue
-def split_speaker_and_dialogue(line):
+def split_speaker_and_dialogue(dialogue):
 
-    speaker = ((line.split(':'))[0]).strip()
-    dialogue = list_to_string((line.split(':'))[1:])
+    speaker = ((dialogue[0].split(':'))[0]).strip()
+    dialogue[0] = list_to_string((dialogue[0].split(':'))[1:])
+    dialogue = list_to_string(dialogue)
 
-    return speaker, dialogue
-
-# Calculates the number of lines a string needs to fit in
-def get_num_of_lines(dialogue):
-
-    count = 0
-
-    # return math.ceil((len(text) % maxcol))
-
-    for text in dialogue:
-        if len(text) > MAX_COLUMNS:
-            count += math.ceil((len(text) % MAX_COLUMNS))
-        else:
-            count += 1
-    
-    return count
-
-# Makes a list of all the dialogues, padded, and ready to print
-def make_list(dialogues):
-
-    final_list = []
-
-    # Get the perspective if not provided by default
-    # Check contidion TBD
-    # perspective, dialogues[0][0] = split_speaker_and_dialogue(dialogues[0][0])
-    perspective = 'Anjali'
-    
-    for dialogue in dialogues:
-
-        # Check perspective
-        if ((dialogue[0]).split(':'))[0].strip() == perspective:
-            padding = DIALOGUE_PADDING
-        else:
-            padding = ""
-        
-        for line in dialogue:
-            # current_line = padding + line
-
-            line = textwrap.wrap(line, WRAP_AT)
-
-            for index in range(len(line)):
-                line[index] = padding + line[index]
-
-            final_list += line
-
-    return final_list
-
-def represent_dialogues(scr, dialogues):
-    
-    scr.scrollok(1)
-
-    MAX_ROWS = (scr.getmaxyx())[0]
-    MAX_COLUMNS = (scr.getmaxyx())[1]
-
-    list_to_print = make_list(dialogues)
-
-    del dialogues
-
-    for lines in list_to_print:
-        scr.addstr(lines + '\n')
-    
-    # scr.addstr('\n\n')
-
-    # Print dialogues
-    # for dialogue in dialogues:
-
-    #     if dialogue[0].find(':') == -1:
-    #         continue
-
-    #     speaker, dialogue[0] = split_speaker_and_dialogue(dialogue[0])
-    #     lines = list_to_string(dialogue)
-
-    #     scr.addstr(speaker + ':\n')
-    #     scr.addstr(lines + '\n')
+    return speaker , dialogue
 
 
-    scr.refresh()
+############ MAIN ################
 
-    while True:
-        key = scr.getch()
-
-        if key == 81:
-            break
-        elif key == curses.KEY_UP:
-            scr.scroll(-1)
-        elif key == curses.KEY_DOWN:
-            scr.scroll(1)
-
-
+# To store dialogues
 dialogues = [[]]
 
 # Check arguments
 arguments = sys.argv
-if len(arguments) != 2:
-    # perror("USAGE:\n\t" + arguments[0] + "-f path_to_file -p perspective\n")
-    perror("USAGE:\n\t" + arguments[0] + " path_to_file\n")
+if len(arguments) != 5:
+    perror("USAGE:\n\t" + arguments[0] + " -f path_to_file -p perspective\n")
     exit(1)
 
+# Parse arguments
+parser = OptionParser()
+
+parser.add_option("-f", dest="filename", help="file to use", metavar="FILE")
+parser.add_option("-p", dest="perspective", help="the perspective for the conversation", metavar="PERSP")
+
+(options, arguments) = parser.parse_args()
+
 # Set Perspective according to -p flag
-# perspective = ""
+# perspective = arguments[4]
+perspective = options.perspective
 
 # Open the file
-chat_file = open(arguments[1], "rt")
+# chat_file = open(arguments[2], "rt")
+chat_file = open(options.filename, "rt")
 
 chat = chat_file.read().split('\n')
 
@@ -204,8 +220,8 @@ for line in chat:
 # There are empty lists on both ends, so trimming 'em off
 dialogues = dialogues[1:-1]
 
-# It's representation time!
-# print(dialogues)
-
-# Calling in a wrapper to avoid exceptions
-curses.wrapper(represent_dialogues, dialogues)
+# It's representation time! Drawing windows
+window = MainWindow(dialogues)
+window.connect("destroy", Gtk.main_quit)
+window.show_all()
+Gtk.main()
