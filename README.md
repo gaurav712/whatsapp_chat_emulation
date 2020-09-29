@@ -1,5 +1,5 @@
 # whatsapp_chat_emulation
-Emulates Whatsapp chat screen in terminal using exported chats.
+Emulates Whatsapp chat screen using exported chats.
 
 Just a fun project.
 
